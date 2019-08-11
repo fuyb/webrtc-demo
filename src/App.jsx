@@ -9,6 +9,7 @@ class App extends React.Component {
         this.onConnected = this.onConnected.bind(this);
         this.onStart = this.onStart.bind(this);
         this.onConnect = this.onConnect.bind(this);
+        this.onClose = this.onClose.bind(this);
         this.onDisconnect = this.onDisconnect.bind(this);
 
         this.videoBox = null;
@@ -18,8 +19,9 @@ class App extends React.Component {
 
         this.webRTC = new WebRTC();
         this.webRTC.onConnect = this.onConnected;
+        this.webRTC.onClose = this.onClose;
     }
-    
+
     onConnected(stream) {
         this.videoBox.addRemoteVideoStream(stream);
     }
@@ -40,6 +42,7 @@ class App extends React.Component {
     }
 
     onDisconnect() {
+        this.webRTC.disconnect();
     }
 
     render () {
