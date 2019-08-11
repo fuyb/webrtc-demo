@@ -99,7 +99,7 @@ export function WebRTC() {
                 break;
             case 'failed':
                 break;
-            case 'close':
+            case 'closed':
                 if (this.onClose !== null) {
                     this.onClose();
                 }
