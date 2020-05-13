@@ -7,63 +7,57 @@ class VideoBox extends React.Component {
         this.addRemoteVideoStream = this.addRemoteVideoStream.bind(this);
         this.onClose = this.onClose.bind(this);
 
-        this.localVideo = null;
-        this.setLocalVideoRef = element => {
-            this.localVideo = element;
-            this.localVideo.onloadedmetadata = e => {
-                this.localVideo.play();
-            }
-        };
-
-        this.remoteVideo = null;
-        this.setRemoteVideoRef = element => {
-            this.remoteVideo = element;
-            this.remoteVideo.onloadedmetadata = e => {
-                this.remoteVideo.play();
-            }
-        };
+        this.localVideo = React.createRef();
     }
 
     componentDidMount() {
     }
 
+    componentDidUpdate(prevProps) {
+        const elements = document.getElementsByName("remote-video");
+        const streams = Object.values(this.props.streams);
+        for (let i = 0; i < streams.length; ++i) {
+            const video = elements[i];
+            video.srcObject = streams[i];
+        }
+    }
+
     addLocalVideoStream(stream) {
-        this.localVideo.srcObject = stream;
+        this.localVideo.current.srcObject = stream;
     }
 
     addRemoteVideoStream(stream) {
-        this.remoteVideo.srcObject = stream;
     }
 
     onClose() {
-        if (this.localVideo.srcObject !== null) {
-            let tracks = this.localVideo.stream.getTracks();
+        if (this.localVideo.current.srcObject !== null) {
+            let tracks = this.localVideo.current.stream.getTracks();
              tracks.forEach(track => {
                  track.stop();
              });
-            this.localVideo.srcObject = null;
+            this.localVideo.current.srcObject = null;
         }
 
-        if (this.remoteVideo.srcObject !== null) {
-            let tracks = this.remoteVideo.stream.getTracks();
+        const elements = document.getElementsByName("remote-video");
+        for (let i = 0; i < elements.length; ++i) {
+            const video = elements[i];
+            let tracks = video.stream.getTracks();
              tracks.forEach(track => {
                  track.stop();
              });
-            this.remoteVideo.srcObject = null;
+            video.srcObject = null;
         }
     }
 
     render () {
         return (
             <div className={"card"}>
-                <div className={"card_part card_part-two"}>
-                    <video ref={this.setLocalVideoRef} controls={true}>
-                    </video>
-                </div>
-                <div className={"card_part card_part-one"}>
-                    <video ref={this.setRemoteVideoRef} controls={true}>
-                    </video>
-                </div>
+                <video key="localVideo" ref={this.localVideo} controls={true} autoPlay={true}>
+                </video>
+                {Object.entries(this.props.streams).map(([key,value],i) =>
+                <video key={key} name="remote-video" controls={true} autoPlay={true}>
+                </video>
+                )}
             </div>
         );
     }

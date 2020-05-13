@@ -1,5 +1,6 @@
 import adapter from 'webrtc-adapter';
 import { SignnalingChannel } from './signnal';
+import queryString from 'query-string';
 
 export function WebRTC() {
     const configuration = {
@@ -23,8 +24,8 @@ export function WebRTC() {
     };
 
     const constraints = {
-        audio: true, 
-        video: { width: 1280, height: 720 }
+        audio: true, //{ echoCancellation: true }, 
+        video: { width: 400, height: 300}
     };
 
     this.getICEServices = function() {
@@ -34,46 +35,49 @@ export function WebRTC() {
         return configuration;
     }
 
+    this.offer = null;
+    this.answer = null;
+    this.pcs = {};
+
     /* 建立signnal连接，用于交换数据 */
     this.signnaling = () => {
-        /* channel */
-        const channel = window.location.search.match(/channel=(\d+)/)[1];
-        /* 本端ID */
-        const id = window.location.search.match(/id=(\d+)/)[1];
-        /* 对端ID */
-        const peer = window.location.search.match(/peer=(\d+)/)[1];
-        this.signnalingChannel = new SignnalingChannel(channel, id, peer);
+        const query = queryString.parse(window.location.search);
+        this.signnalingChannel = new SignnalingChannel(query.channel, query.id, query.peer);
 
-        this.signnalingChannel.onmessage = async (data) => {
+        this.signnalingChannel.onmessage = async (message) => {
             try {
-                if (data.sdp) {
-                    console.log(data.sdp.type);
-                    switch (data.sdp.type) {
+                if (message.data.sdp) {
+                    console.log(message.data.sdp.type);
+                    const pc = this.pcs[message.sender].pc;
+                    switch (message.data.sdp.type) {
                         case 'offer':
-                            await this.pc.setRemoteDescription(data.sdp);
+                            await pc.setRemoteDescription(message.data.sdp);
                             const stream =
                                 await navigator.mediaDevices.getUserMedia(constraints);
                             stream.getTracks().forEach((track) =>
-                                this.pc.addTrack(track, stream));
-                            await this.pc.setLocalDescription(await this.pc.createAnswer());
-                            this.signnalingChannel.send({sdp: this.pc.localDescription});
+                                pc.addTrack(track, stream));
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            this.signnalingChannel.send({sdp: pc.localDescription}, message.sender);
                             break;
                         case 'answer':
-                            await this.pc.setRemoteDescription(data.sdp);
+                            await pc.setRemoteDescription(message.data.sdp);
                             break;
                         default:
                             console.log('Unsupported SDP type');
                             break;
                     }
-                } else if (data.candidate) {
-                    await this.pc.addIceCandidate(data.candidate);
-                } else if (data.ready) {
+                } else if (message.data.candidate) {
+                    const pc = this.pcs[message.sender].pc;
+                    await pc.addIceCandidate(message.data.candidate);
+                } else if (message.data.ready) {
                     /* 收到对端Ready询问 */
-                    this.createOffer();
-                    this.signnalingChannel.send({readyACK: true});
-                } else if (data.close) {
+                    this.createOffer(message.sender);
+                    this.signnalingChannel.send({readyACK: true}, message.sender);
+                } else if (message.data.close) {
+                    const pc = this.pcs[message.sender].pc;
                     /* 收到对端Close消息 */
-                    this.pc.close();
+                    pc.close();
                 }
             } catch (err) {
                 console.log(err);
@@ -81,18 +85,16 @@ export function WebRTC() {
         };
     }
 
-    this.pc = new window.RTCPeerConnection(this.getICEServices());
 
-    this.pc.onicecandidate = (event) => {
+    const onicecandidate = (event) => {
         // send candidate
         if (event.candidate) {
-            this.signnalingChannel.send({candidate: event.candidate});
+            this.signnalingChannel.send({candidate: event.candidate}, 'all');
         }
     };
 
-    this.pc.onconnectionstatechange = (event) => {
-        console.log(this.pc.connectionState);
-        switch(this.pc.connectionState) {
+    const onconnectionstatechange = (event) => {
+        switch(event.target.connectionState) {
             case 'connected':
                 break;
             case 'disconnected':
@@ -109,52 +111,67 @@ export function WebRTC() {
         }
     };
 
-    this.pc.onnegotiationneeded = async () => {
+    const onnegotiationneeded = async () => {
         // 可以开始协商连接
         console.log('onnegotiationneeded');
     };
 
     this.onConnect = null;
     this.onClose = null;
+    this.pcs = [];
 
     // 对端视频流
-    this.pc.ontrack = (event) => {
-        console.log(event);
+    const ontrack = (event) => {
         try {
             if (this.onConnect !== null) {
-                this.onConnect(event.streams[0]);
+                this.onConnect(event);
             }
         } catch (err) {
             console.log(err);
         }
     };
 
-    this.start = async function() {
+    this.start = async function(pc) {
         try {
-            const stream =
+            this.stream =
                 await navigator.mediaDevices.getUserMedia(constraints);
-            stream.getTracks().forEach((track) =>
-                this.pc.addTrack(track, stream));
-            return Promise.resolve(stream);
+            return Promise.resolve(this.stream);
         } catch (err) {
             return Promise.reject(err);
         } 
     };
 
-    this.createOffer = async function() {
+    this.createPC = function(id) {
+        const pc = new window.RTCPeerConnection(this.getICEServices());
+        pc.onicecandidate = onicecandidate;
+        pc.onconnectionstatechange = onconnectionstatechange;
+        pc.onnegotiationneeded = onnegotiationneeded;
+        pc.ontrack = ontrack;
+        this.stream.getTracks().forEach((track) =>
+            pc.addTrack(track, this.stream));
+        this.pcs[id] = {pc: pc};
+        return pc;
+    }
+
+    this.createOffer = async function(id) {
         try {
-            await this.pc.setLocalDescription(await this.pc.createOffer(offerConfig));
-            this.signnalingChannel.send({sdp: this.pc.localDescription});
+            if (!this.pcs[id]) {
+                const pc = this.createPC(id);
+                const offer = await pc.createOffer(offerConfig);
+                await pc.setLocalDescription(offer);
+                this.signnalingChannel.send({sdp: pc.localDescription}, id);
+            }
         } catch(error) {
             console.log(error);
         }
     }
 
     this.connect = async function() {
-        this.signnalingChannel.send({ready: true});
+        this.createPC(this.signnalingChannel.peer);
+        this.signnalingChannel.send({ready: true}, this.signnalingChannel.peer);
     }
 
     this.disconnect = async function() {
-        this.signnalingChannel.send({close: true});
+        this.signnalingChannel.send({close: true}, this.signnalingChannel.peer);
     }
 }

@@ -20,10 +20,23 @@ class App extends React.Component {
         this.webRTC = new WebRTC();
         this.webRTC.onConnect = this.onConnected;
         this.webRTC.onClose = this.onClose;
+
+        this.state = {
+            streams: {}
+        };
     }
 
-    onConnected(stream) {
-        this.videoBox.addRemoteVideoStream(stream);
+    onConnected(event) {
+        const streams = this.state.streams;
+        const stream = event.streams[0];
+        if (!streams[stream.id]) {
+            streams[stream.id] = stream;
+        } else {
+            streams[stream.id].addTrack(event.track);
+        }
+        this.setState({
+            streams: streams
+        });
     }
 
     onClose() {
@@ -47,14 +60,21 @@ class App extends React.Component {
 
     render () {
         return (
+        <div style={{display: 'flex', 'flexDirection': 'column'}}>
             <div>
                 <ButtonBox 
                  onStart={this.onStart}
                  onConnect={this.onConnect}
                  onDisconnect={this.onDisconnect}
                 />
-                <VideoBox ref={this.setVideoBoxRef} />
             </div>
+            <div>
+                <VideoBox
+                ref={this.setVideoBoxRef}
+                streams={this.state.streams}
+                />
+            </div>
+        </div>
         );
     }
 }

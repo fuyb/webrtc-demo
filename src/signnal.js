@@ -2,7 +2,7 @@ import io from 'socket.io-client';
 
 
 export function SignnalingChannel(channel, sender, peer) {
-    const server = 'https://ss.yanbin.me:29559';
+    const server = 'https://webrtc.bcjiaoyu.com:9559';
     this.channel = channel;
     this.sender = sender;
     this.peer = peer;
@@ -24,20 +24,22 @@ export function SignnalingChannel(channel, sender, peer) {
     this.onmessage = data => {
     };
 
-    this.send = data => {
+    this.send = (data, sendto) => {
         this.socket.emit('message', {
             sender: this.sender,
             data: {
                 data: data,
-                sender: this.sender
+                sender: this.sender,
+                sendto: sendto
             }
         });
     };
 
     this.socket.on('message', message => {
-        console.log(message);
-        if (message.sender === this.peer) {
-            this.onmessage(message.data);
+        console.log('sendto: ', message.sendto);
+        if (message.sendto === this.sender || message.sendto === 'all') {
+          console.log(message);
+          this.onmessage(message);
         }
     });
 }
