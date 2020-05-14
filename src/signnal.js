@@ -1,45 +1,23 @@
-import io from 'socket.io-client';
+import { ChatroomProvider } from './chatroom-provider';
 
 
 export function SignnalingChannel(channel, sender, peer) {
-    const server = 'https://webrtc.bcjiaoyu.com:9559';
-    this.channel = channel;
-    this.sender = sender;
-    this.peer = peer;
-
-    io.connect(server).emit('new-channel', {
-        channel: channel,
-        sender: sender
-    });
-
-    this.socket = io(`${server}/${channel}`);
-    this.socket.on('connect', () => {
-        console.log('socket io connect.');
-    });
-
-    this.socket.on('disconnect', () => {
-        console.log('socket io disconnect.');
-    });
-
-    this.onmessage = data => {
-    };
-
-    this.send = (data, sendto) => {
-        this.socket.emit('message', {
-            sender: this.sender,
-            data: {
-                data: data,
-                sender: this.sender,
-                sendto: sendto
-            }
-        });
-    };
-
-    this.socket.on('message', message => {
-        console.log('sendto: ', message.sendto);
-        if (message.sendto === this.sender || message.sendto === 'all') {
-          console.log(message);
-          this.onmessage(message);
-        }
-    });
+    const server = 'wss://app.bcjiaoyu.com/live/classroom/signaling/';
+    this.chatroomProvider = new ChatroomProvider(server, sender, sender, channel);
+    this.chatroomProvider.onDataMessage = this.onDataMessage.bind(this);
+    this.chatroomProvider.openConnection();
 }
+
+SignnalingChannel.prototype.send = function(data, sendto) {
+    this.chatroomProvider.writeToServer('msg', sendto, {
+        data: data,
+    });
+};
+
+SignnalingChannel.prototype.onDataMessage = function(message) {
+    if (message.sendto === this.chatroomProvider.username || message.sendto === 'all') {
+        const msg = message.message;
+        msg.sender = message.user;
+        this.onmessage(msg);
+    }
+};

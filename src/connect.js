@@ -43,6 +43,7 @@ export function WebRTC() {
     this.signnaling = () => {
         const query = queryString.parse(window.location.search);
         this.signnalingChannel = new SignnalingChannel(query.channel, query.id, query.peer);
+        this.peer = query.peer;
 
         this.signnalingChannel.onmessage = async (message) => {
             try {
@@ -68,19 +69,25 @@ export function WebRTC() {
                             break;
                     }
                 } else if (message.data.candidate) {
-                    const pc = this.pcs[message.sender].pc;
-                    await pc.addIceCandidate(message.data.candidate);
+                    if (this.pcs[message.sender]) {
+                        const pc = this.pcs[message.sender].pc;
+                        await pc.addIceCandidate(message.data.candidate);
+                    }
                 } else if (message.data.ready) {
                     /* 收到对端Ready询问 */
                     this.createOffer(message.sender);
                     this.signnalingChannel.send({readyACK: true}, message.sender);
                 } else if (message.data.close) {
-                    const pc = this.pcs[message.sender].pc;
-                    /* 收到对端Close消息 */
-                    pc.close();
+                    if (this.pcs[message.sender]) {
+                        let pc = this.pcs[message.sender].pc;
+                        pc.close();
+                        pc = null;
+                        this.pcs[message.sender] = null;
+                    }
                 }
             } catch (err) {
-                console.log(err);
+                console.log(message);
+                console.error(err);
             }
         };
     }
@@ -94,6 +101,7 @@ export function WebRTC() {
     };
 
     const onconnectionstatechange = (event) => {
+        console.log(event.target.connectionState);
         switch(event.target.connectionState) {
             case 'connected':
                 break;
@@ -102,6 +110,7 @@ export function WebRTC() {
             case 'failed':
                 break;
             case 'closed':
+                console.log(event.target.getReceivers());
                 if (this.onClose !== null) {
                     this.onClose();
                 }
@@ -156,6 +165,7 @@ export function WebRTC() {
     this.createOffer = async function(id) {
         try {
             if (!this.pcs[id]) {
+                console.log('createOffer----->');
                 const pc = this.createPC(id);
                 const offer = await pc.createOffer(offerConfig);
                 await pc.setLocalDescription(offer);
@@ -167,11 +177,16 @@ export function WebRTC() {
     }
 
     this.connect = async function() {
-        this.createPC(this.signnalingChannel.peer);
-        this.signnalingChannel.send({ready: true}, this.signnalingChannel.peer);
+        this.createPC(this.peer);
+        this.signnalingChannel.send({ready: true}, this.peer);
     }
 
     this.disconnect = async function() {
-        this.signnalingChannel.send({close: true}, this.signnalingChannel.peer);
+        if (!this.pcs[this.peer]) {
+            let pc = this.pcs[this.peer];
+            pc.close();
+            pc = null;
+        }
+        this.signnalingChannel.send({close: true}, this.peer);
     }
 }
