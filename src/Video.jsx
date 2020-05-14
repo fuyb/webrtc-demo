@@ -30,23 +30,6 @@ class VideoBox extends React.Component {
     }
 
     onClose() {
-        if (this.localVideo.current.srcObject !== null) {
-            let tracks = this.localVideo.current.stream.getTracks();
-             tracks.forEach(track => {
-                 track.stop();
-             });
-            this.localVideo.current.srcObject = null;
-        }
-
-        const elements = document.getElementsByName("remote-video");
-        for (let i = 0; i < elements.length; ++i) {
-            const video = elements[i];
-            let tracks = video.stream.getTracks();
-             tracks.forEach(track => {
-                 track.stop();
-             });
-            video.srcObject = null;
-        }
     }
 
     render () {

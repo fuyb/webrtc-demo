@@ -79,9 +79,6 @@ export function WebRTC() {
                     this.signnalingChannel.send({readyACK: true}, message.sender);
                 } else if (message.data.close) {
                     if (this.pcs[message.sender]) {
-                        let pc = this.pcs[message.sender].pc;
-                        pc.close();
-                        pc = null;
                         this.pcs[message.sender] = null;
                     }
                 }
@@ -106,14 +103,15 @@ export function WebRTC() {
             case 'connected':
                 break;
             case 'disconnected':
+                const receivers = event.target.getReceivers();
+                if (this.onClose !== null && receivers) {
+                    this.onClose(receivers[0].track);
+                }
+                event.target.close();
                 break;
             case 'failed':
                 break;
             case 'closed':
-                console.log(event.target.getReceivers());
-                if (this.onClose !== null) {
-                    this.onClose();
-                }
                 break;
             default:
                 break;
@@ -131,6 +129,7 @@ export function WebRTC() {
 
     // 对端视频流
     const ontrack = (event) => {
+        console.log(event);
         try {
             if (this.onConnect !== null) {
                 this.onConnect(event);
@@ -150,6 +149,17 @@ export function WebRTC() {
         } 
     };
 
+    this.getIdentityAssertion = async function(pc) {
+         try {
+             const identity = await pc.peerIdentity;
+             console.log(identity);
+             return identity;
+         } catch(err) {
+             console.log("Error identifying remote peer: ", err);
+             return null;
+         }
+    };
+
     this.createPC = function(id) {
         const pc = new window.RTCPeerConnection(this.getICEServices());
         pc.onicecandidate = onicecandidate;
@@ -165,7 +175,6 @@ export function WebRTC() {
     this.createOffer = async function(id) {
         try {
             if (!this.pcs[id]) {
-                console.log('createOffer----->');
                 const pc = this.createPC(id);
                 const offer = await pc.createOffer(offerConfig);
                 await pc.setLocalDescription(offer);
@@ -182,11 +191,16 @@ export function WebRTC() {
     }
 
     this.disconnect = async function() {
-        if (!this.pcs[this.peer]) {
-            let pc = this.pcs[this.peer];
+        if (this.pcs[this.peer]) {
+            let pc = this.pcs[this.peer].pc;
+            this.pcs[this.peer] = null;
+            this.signnalingChannel.send({close: true}, this.peer);
+            const receivers = pc.getReceivers();
+            if (this.onClose !== null && receivers) {
+                this.onClose(receivers[0].track);
+            }
             pc.close();
             pc = null;
         }
-        this.signnalingChannel.send({close: true}, this.peer);
     }
 }

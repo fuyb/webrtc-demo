@@ -34,13 +34,22 @@ class App extends React.Component {
         } else {
             streams[stream.id].addTrack(event.track);
         }
+        console.log(streams);
         this.setState({
             streams: streams
         });
     }
 
-    onClose() {
+    onClose(track) {
+        console.log(track.id);
         this.videoBox.onClose();
+        const streams = {};
+        for (let [key, value] of Object.entries(this.state.streams)) {
+            if (!value.getTrackById(track.id)) {
+                streams[key] = value;
+            }
+        }
+        this.setState(Object.assign({}, {streams: streams}));
     }
 
     onStart() {
