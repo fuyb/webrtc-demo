@@ -26,13 +26,14 @@ class App extends React.Component {
         };
     }
 
-    onConnected(event) {
+    onConnected(id, event) {
         const streams = this.state.streams;
         const stream = event.streams[0];
-        if (!streams[stream.id]) {
-            streams[stream.id] = stream;
+        const streamId = `stream-${id}`;
+        if (!streams[streamId]) {
+            streams[streamId] = stream;
         } else {
-            streams[stream.id].addTrack(event.track);
+            streams[streamId].addTrack(event.track);
         }
         console.log(streams);
         this.setState({
@@ -53,10 +54,15 @@ class App extends React.Component {
     }
 
     onStart() {
-        this.webRTC.signnaling();
-        this.webRTC.start().then(stream => {
-            this.videoBox.addLocalVideoStream(stream);
-        });
+        console.log('onStart');
+        try {
+            this.webRTC.signnaling();
+            this.webRTC.start().then(stream => {
+                this.videoBox.addLocalVideoStream(stream);
+            });
+        } catch (e) {
+            console.log(e);
+        }
     }
 
     onConnect() {

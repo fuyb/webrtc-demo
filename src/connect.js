@@ -128,11 +128,10 @@ export function WebRTC() {
     this.pcs = [];
 
     // 对端视频流
-    const ontrack = (event) => {
-        console.log(event);
+    const ontrack = id => event => {
         try {
             if (this.onConnect !== null) {
-                this.onConnect(event);
+                this.onConnect(id, event);
             }
         } catch (err) {
             console.log(err);
@@ -165,7 +164,7 @@ export function WebRTC() {
         pc.onicecandidate = onicecandidate;
         pc.onconnectionstatechange = onconnectionstatechange;
         pc.onnegotiationneeded = onnegotiationneeded;
-        pc.ontrack = ontrack;
+        pc.ontrack = ontrack(id);
         this.stream.getTracks().forEach((track) =>
             pc.addTrack(track, this.stream));
         this.pcs[id] = {pc: pc};
