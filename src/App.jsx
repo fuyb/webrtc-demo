@@ -41,16 +41,14 @@ class App extends React.Component {
         });
     }
 
-    onClose(track) {
-        console.log(track.id);
+    onClose(id) {
+        const streamId = `stream-${id}`;
         this.videoBox.onClose();
-        const streams = {};
-        for (let [key, value] of Object.entries(this.state.streams)) {
-            if (!value.getTrackById(track.id)) {
-                streams[key] = value;
-            }
-        }
-        this.setState(Object.assign({}, {streams: streams}));
+        this.setState((state, props) => {
+            const streams = state.streams;
+            delete streams[streamId];
+            return Object.assign({}, {streams: streams});
+        });
     }
 
     onStart() {

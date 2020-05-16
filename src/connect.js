@@ -97,16 +97,13 @@ export function WebRTC() {
         }
     };
 
-    const onconnectionstatechange = (event) => {
+    const onconnectionstatechange = id => event => {
         console.log(event.target.connectionState);
         switch(event.target.connectionState) {
             case 'connected':
                 break;
             case 'disconnected':
-                const receivers = event.target.getReceivers();
-                if (this.onClose !== null && receivers) {
-                    this.onClose(receivers[0].track);
-                }
+                this.onClose(id);
                 event.target.close();
                 break;
             case 'failed':
@@ -162,7 +159,7 @@ export function WebRTC() {
     this.createPC = function(id) {
         const pc = new window.RTCPeerConnection(this.getICEServices());
         pc.onicecandidate = onicecandidate;
-        pc.onconnectionstatechange = onconnectionstatechange;
+        pc.onconnectionstatechange = onconnectionstatechange(id);
         pc.onnegotiationneeded = onnegotiationneeded;
         pc.ontrack = ontrack(id);
         this.stream.getTracks().forEach((track) =>
@@ -194,10 +191,7 @@ export function WebRTC() {
             let pc = this.pcs[this.peer].pc;
             this.pcs[this.peer] = null;
             this.signnalingChannel.send({close: true}, this.peer);
-            const receivers = pc.getReceivers();
-            if (this.onClose !== null && receivers) {
-                this.onClose(receivers[0].track);
-            }
+            this.onClose(this.peer);
             pc.close();
             pc = null;
         }
