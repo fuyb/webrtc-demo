@@ -158,10 +158,12 @@ export function WebRTC() {
 
     this.createPC = function(id) {
         const pc = new window.RTCPeerConnection(this.getICEServices());
+        const connectId = `${id}-${Date.now()}`;
+        this.connectId = connectId;
         pc.onicecandidate = onicecandidate;
-        pc.onconnectionstatechange = onconnectionstatechange(id);
+        pc.onconnectionstatechange = onconnectionstatechange(connectId);
         pc.onnegotiationneeded = onnegotiationneeded;
-        pc.ontrack = ontrack(id);
+        pc.ontrack = ontrack(connectId);
         this.stream.getTracks().forEach((track) =>
             pc.addTrack(track, this.stream));
         this.pcs[id] = {pc: pc};
@@ -191,7 +193,7 @@ export function WebRTC() {
             let pc = this.pcs[this.peer].pc;
             this.pcs[this.peer] = null;
             this.signnalingChannel.send({close: true}, this.peer);
-            this.onClose(this.peer);
+            this.onClose(this.connectId);
             pc.close();
             pc = null;
         }
