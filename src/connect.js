@@ -54,10 +54,6 @@ export function WebRTC() {
                         case 'offer':
                             message.data.sdp.sdp = updateBandWidthRestriction(message.data.sdp.sdp, 256);
                             await pc.setRemoteDescription(message.data.sdp);
-                            const stream =
-                                await navigator.mediaDevices.getUserMedia(constraints);
-                            stream.getTracks().forEach((track) =>
-                                pc.addTrack(track, stream));
                             const answer = await pc.createAnswer();
                             await pc.setLocalDescription(answer);
                             this.signnalingChannel.send({sdp: pc.localDescription}, message.sender);
