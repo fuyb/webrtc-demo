@@ -52,6 +52,7 @@ export function WebRTC() {
                     const pc = this.pcs[message.sender].pc;
                     switch (message.data.sdp.type) {
                         case 'offer':
+                            message.data.sdp.sdp = updateBandWidthRestriction(message.data.sdp.sdp, 256);
                             await pc.setRemoteDescription(message.data.sdp);
                             const stream =
                                 await navigator.mediaDevices.getUserMedia(constraints);
@@ -62,6 +63,7 @@ export function WebRTC() {
                             this.signnalingChannel.send({sdp: pc.localDescription}, message.sender);
                             break;
                         case 'answer':
+                            message.data.sdp.sdp = updateBandWidthRestriction(message.data.sdp.sdp, 256);
                             await pc.setRemoteDescription(message.data.sdp);
                             break;
                         default:
@@ -135,6 +137,56 @@ export function WebRTC() {
         }
     };
 
+    const updateBandWidthRestriction = (sdp, bandWidth) => {
+        let modifier = 'AS';
+        if (adapter.browserDetails.browser === 'firefox') {
+            bandWidth = (bandWidth >>> 0) * 1000;
+            modifier = 'TIAS';
+        }
+
+        if (sdp.indexOf(`b=${modifier}:`) === -1) {
+            sdp = sdp.replace(/c=IN (.*)\r\n/, `c=IN $1\r\nb=${modifier}:${bandWidth}\r\n`);
+        } else {
+            sdp = sdp.replace(new RegExp(`b=${modifier}:.*\r\n`), `b=${modifier}:${bandWidth}\r\n`);
+        }
+        return sdp;
+    };
+
+    const preferCodec = (codecs, mimeType) => {
+        let otherCodecs = [];
+        let sortedCodecs = [];
+
+        codecs.forEach(codec => {
+            if (codec.mimeType === mimeType) {
+                sortedCodecs.push(codec);
+            } else {
+                otherCodecs.push(codec);
+            }
+        });
+
+        return sortedCodecs.concat(otherCodecs);
+    };
+
+    const changeVideoAudioCodec = (pc, videoMimeType, audioMimeType) => {
+        const transceivers = pc.getTransceivers();
+        transceivers.forEach(transceiver => {
+            const kind = transceiver.sender.track.kind;
+            let sendCodecs = RTCRtpSender.getCapabilities(kind).codecs;
+            let recvCodecs = RTCRtpReceiver.getCapabilities(kind).codecs;
+            console.log(sendCodecs, recvCodecs);
+
+            if (kind === "video") {
+                sendCodecs = preferCodec(sendCodecs, videoMimeType);
+                recvCodecs = preferCodec(recvCodecs, videoMimeType);
+                transceiver.setCodecPreferences([...sendCodecs, ...recvCodecs]);
+            } else if (kind === "audio") {
+                sendCodecs = preferCodec(sendCodecs, audioMimeType);
+                recvCodecs = preferCodec(recvCodecs, audioMimeType);
+                transceiver.setCodecPreferences([...sendCodecs, ...recvCodecs]);
+            }
+        });
+    };
+
     this.start = async function(pc) {
         try {
             this.stream =
@@ -174,6 +226,7 @@ export function WebRTC() {
         try {
             if (!this.pcs[id]) {
                 const pc = this.createPC(id);
+                changeVideoAudioCodec(pc, 'video/VP8', 'audio/opus');
                 const offer = await pc.createOffer(offerConfig);
                 await pc.setLocalDescription(offer);
                 this.signnalingChannel.send({sdp: pc.localDescription}, id);
