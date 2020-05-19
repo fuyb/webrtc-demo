@@ -8,8 +8,6 @@ export function WebRTC() {
             url: 'turn:stun.cxy61.com:3478',
             credential: 'LPBZMexvyfh4pM0r',
             username: 'VPr7xtVicirk'
-        }, {
-            urls: ['stun:stun.cxy61.com:3478']
         }],
         iceCandidatePoolSize: 0,
         /* https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration#RTCIceTransportPolicy_enum */
@@ -29,8 +27,10 @@ export function WebRTC() {
     };
 
     this.getICEServices = function() {
-        if (adapter.browserDetails.browser !== 'chrome') {
+        if (adapter.browserDetails.browser === 'firefox') {
             return configuration.iceServices;
+        } else if (adapter.browserDetails.browser === 'safari') {
+            configuration.iceTransportPolicy = 'relay';
         }
         return configuration;
     }
@@ -71,6 +71,7 @@ export function WebRTC() {
                             break;
                     }
                 } else if (message.data.candidate) {
+                    console.log(message.data.candidate);
                     if (this.pcs[message.sender]) {
                         const pc = this.pcs[message.sender].pc;
                         await pc.addIceCandidate(message.data.candidate);
