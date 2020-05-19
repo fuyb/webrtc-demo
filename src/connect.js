@@ -13,7 +13,7 @@ export function WebRTC() {
         /* https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration#RTCIceTransportPolicy_enum */
         iceTransportPolicy: 'all', 
         /* https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration#RTCBundlePolicy_enum */
-        bundlePolicy: 'max-bundle'
+        bundlePolicy: 'balanced'
     };
 
     const offerConfig  = {
